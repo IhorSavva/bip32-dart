@@ -48,3 +48,6 @@
 
 ## 2.1.1
 - fix bigIntEncoding
+
+## 2.2.0
+- implement null-safety
