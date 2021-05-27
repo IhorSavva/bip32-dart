@@ -31,6 +31,10 @@
 
 - Update pointycastle version to 2.0.0
 
+## 1.0.10
+
+- Fix sign
+
 ## 2.0.0
 
 - Update packages
