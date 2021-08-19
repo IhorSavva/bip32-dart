@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:bip32_defichain/bip32.dart';
+
 import 'utils/crypto.dart';
 import 'utils/ecurve.dart' as ecc;
 import 'package:bs58check/bs58check.dart' as bs58check;
@@ -211,6 +213,10 @@ class BIP32 {
   }
 
   factory BIP32.fromSeed(Uint8List seed, [NetworkType? nw]) {
+    return BIP32.fromSeedWithCustomKey(seed, "Bitcoin seed", nw);
+  }
+
+  factory BIP32.fromSeedWithCustomKey(Uint8List seed, String key, [NetworkType? nw]) {
     if (seed.length < 16) {
       throw new ArgumentError("Seed should be at least 128 bits");
     }
@@ -218,7 +224,7 @@ class BIP32 {
       throw new ArgumentError("Seed should be at most 512 bits");
     }
     NetworkType network = nw ?? _BITCOIN;
-    final I = hmacSHA512(utf8.encode("Bitcoin seed") as Uint8List, seed);
+    final I = hmacSHA512(utf8.encode(key) as Uint8List, seed);
     final IL = I.sublist(0, 32);
     final IR = I.sublist(32);
     return BIP32.fromPrivateKey(IL, IR, network);

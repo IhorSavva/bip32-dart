@@ -51,3 +51,6 @@
 
 ## 2.2.0
 - implement null-safety
+
+## 2.3.0
+- add custom seed encryption key
