@@ -140,6 +140,19 @@ Uint8List sign(Uint8List hash, Uint8List x) {
   return buffer;
 }
 
+Uint8List encodeSignature(Uint8List signature, int recovery, bool compressed) {
+  Uint8List buffer = new Uint8List(65);
+  buffer.setRange(1, 65, signature);
+
+  if (compressed) {
+    recovery += 4;
+  }
+
+  buffer[0] = recovery + 27;
+
+  return buffer;
+}
+
 bool verify(Uint8List hash, Uint8List q, Uint8List signature) {
   if (!isScalar(hash)) throw new ArgumentError(THROW_BAD_HASH);
   if (!isPoint(q)) throw new ArgumentError(THROW_BAD_POINT);

@@ -54,3 +54,6 @@
 
 ## 2.3.0
 - add custom seed encryption key
+
+## 3.0.0
+- add signature encoding

@@ -1,14 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:bip32_defichain/bip32.dart';
-
 import 'utils/crypto.dart';
 import 'utils/ecurve.dart' as ecc;
 import 'package:bs58check/bs58check.dart' as bs58check;
 import 'utils/wif.dart' as wif;
 import 'dart:convert';
 
-// TODO: Put public facing types in this file.
 class Bip32Type {
   int public;
   int private;
