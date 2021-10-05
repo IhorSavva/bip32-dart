@@ -61,6 +61,5 @@
 ## 3.0.1
 - add segwit type to signing
 
-
 ## 3.0.1+1
 - add correct recId calculation
