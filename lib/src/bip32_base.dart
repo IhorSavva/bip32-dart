@@ -6,6 +6,8 @@ import 'package:bs58check/bs58check.dart' as bs58check;
 import 'utils/wif.dart' as wif;
 import 'dart:convert';
 
+enum SegwitType { None, P2WPKH, P2SH_P2WPKH }
+
 class Bip32Type {
   int public;
   int private;

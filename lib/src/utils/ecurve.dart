@@ -1,12 +1,17 @@
+import 'dart:ffi';
 import 'dart:typed_data';
+import 'package:bip32_defichain/bip32.dart';
 import 'package:hex/hex.dart';
 import "package:pointycastle/ecc/curves/secp256k1.dart";
 import "package:pointycastle/api.dart" show PrivateKeyParameter, PublicKeyParameter;
 import 'package:pointycastle/ecc/api.dart' show ECPrivateKey, ECPublicKey, ECSignature, ECPoint;
+import 'package:pointycastle/export.dart';
 import "package:pointycastle/signers/ecdsa_signer.dart";
 import 'package:pointycastle/macs/hmac.dart';
 import "package:pointycastle/digests/sha256.dart";
 import 'package:pointycastle/src/utils.dart';
+
+final ECDomainParameters _domainParams = ECDomainParameters('secp256k1');
 
 final ZERO32 = Uint8List.fromList(List.generate(32, (index) => 0));
 final EC_GROUP_ORDER = HEX.decode("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
@@ -124,10 +129,15 @@ Uint8List? privateAdd(Uint8List d, Uint8List tweak) {
   return dt;
 }
 
-Uint8List sign(Uint8List hash, Uint8List x) {
+ECSignature signEc(Uint8List hash, Uint8List x) {
   if (!isScalar(hash)) throw new ArgumentError(THROW_BAD_HASH);
   if (!isPrivate(x)) throw new ArgumentError(THROW_BAD_PRIVATE);
   ECSignature sig = deterministicGenerateK(hash, x);
+
+  return sig;
+}
+
+Uint8List normalizeEcSignature(ECSignature sig) {
   Uint8List buffer = new Uint8List(64);
   buffer.setRange(0, 32, _encodeBigInt(sig.r));
   var s;
@@ -140,7 +150,92 @@ Uint8List sign(Uint8List hash, Uint8List x) {
   return buffer;
 }
 
-Uint8List encodeSignature(Uint8List signature, int recovery, bool compressed) {
+Uint8List sign(Uint8List hash, Uint8List x) {
+  ECSignature sig = signEc(hash, x);
+  return normalizeEcSignature(sig);
+}
+
+Uint8List signMessage(Uint8List hash, Uint8List privateKey, bool compressed, SegwitType segwitType) {
+  var signed = signEc(hash, privateKey);
+  var normalized = normalizeEcSignature(signed);
+  var recId = _calculateI(hash, privateKey, signed, compressed);
+
+  var nShifted = n >> 1;
+  if (signed.s.compareTo(nShifted) > 0) {
+    recId ^= 1;
+  }
+
+  return encodeSignature(normalized, recId, compressed, segwitType);
+}
+
+int _calculateI(List<int> decodedMessage, Uint8List privateKey, ECSignature signature, bool compressed) {
+  var ret = 0;
+  var hexPrivKey = HEX.encode(privateKey);
+
+  var actualKey = hexPrivKey;
+  var pubKeyPoint = (_domainParams.G * BigInt.parse(actualKey, radix: 16))!;
+  for (var i = 0; i < 4; i++) {
+    ret = i;
+    ECPoint qprime;
+    try {
+      qprime = _recoverPublicKey(i, decodedMessage, signature, compressed);
+    } catch (e) {
+      continue;
+    }
+
+    if (qprime == pubKeyPoint) {
+      return ret;
+    }
+  }
+
+  ret = -1;
+  return ret;
+}
+
+ECPoint _recoverPublicKey(int i, List<int> hashBuffer, ECSignature signature, bool compressed) {
+  if (![0, 1, 2, 3].contains(i)) {
+    throw ArgumentError('i must be equal to 0, 1, 2, or 3');
+  }
+
+  var tmp = HEX.encode(hashBuffer);
+  var e = BigInt.parse(tmp, radix: 16);
+
+  var r = signature.r;
+  var s = signature.s;
+
+  // The more significant bit specifies whether we should use the
+  // first or second candidate key.
+  var isSecondKey = i >> 1 != 0;
+
+  BigInt n = _domainParams.n;
+  ECPoint G = _domainParams.G;
+
+  // 1.1 Let x = r + jn
+  BigInt x = isSecondKey ? r + n : r;
+  var yTilde = i & 1;
+  ECPoint R = _domainParams.curve.decompressPoint(yTilde, x);
+
+  // 1.4 Check that nR is at infinity
+  ECPoint? nR = R * n;
+
+  if (!nR!.isInfinity) {
+    throw ArgumentError('nR is not a valid curve point');
+  }
+
+  // Compute -e from e
+  var eNeg = -e % n; //FIXME: ? unsigned mod ?
+
+  // 1.6.1 Compute Q = r^-1 (sR - eG)
+  // Q = r^-1 (sR + -eG)
+  var rInv = r.modInverse(n);
+
+  // var Q = R.multiplyTwo(s, G, eNeg).mul(rInv);
+  var Q = (((R * s)! + G * eNeg)! * rInv)!;
+
+  return _domainParams.curve.createPoint(Q.x!.toBigInteger()!, Q.y!.toBigInteger()!, compressed);
+}
+
+Uint8List encodeSignature(Uint8List signature, int recovery, bool compressed, SegwitType segwitType) {
   Uint8List buffer = new Uint8List(65);
   buffer.setRange(1, 65, signature);
 
