@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:bip32_defichain/bip32.dart';
 import 'package:hex/hex.dart';
